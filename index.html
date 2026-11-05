@@ -1,0 +1,108 @@
+<!doctype html>
+<html lang="id">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#101827">
+  <meta name="description" content="FocusFlow — personal productivity workspace">
+  <link rel="manifest" href="./manifest.webmanifest">
+  <link rel="icon" type="image/png" href="./assets/icons/icon-192.png">
+  <link rel="apple-touch-icon" href="./assets/icons/icon-192.png">
+  <link rel="stylesheet" href="./assets/style.css">
+  <title>FocusFlow</title>
+</head>
+<body>
+  <div class="app-shell">
+    <aside class="sidebar">
+      <a class="brand" href="#"><span class="brand-mark">F</span><span>FocusFlow</span></a>
+      <div class="side-label">WORKSPACE</div>
+      <button class="nav-item active" data-view="dashboard"><span>⌂</span> Dashboard</button>
+      <button class="nav-item" data-view="tasks"><span>☷</span> My Tasks</button>
+      <button class="nav-item" data-view="focus"><span>◷</span> Focus Timer</button>
+      <button class="nav-item" data-view="habits"><span>✳</span> Habit Tracker</button>
+      <div class="side-label second">COMING NEXT</div>
+      <div class="nav-muted">▦ &nbsp; Smart Calendar</div>
+      <div class="nav-muted">♧ &nbsp; Team Workspace</div>
+      <div class="nav-muted">▤ &nbsp; Analytics</div>
+      <div class="sidebar-bottom" data-account role="button" tabindex="0" title="Account"><span class="avatar" id="side-avatar">N</span><div><b id="side-name">My Workspace</b><small id="side-sub">Local mode</small></div></div>
+    </aside>
+
+    <main class="main">
+      <header class="topbar">
+        <div><div class="eyebrow" id="today-label">YOUR PRODUCTIVITY SPACE</div><h1 id="page-title">Good day, Nandra 👋</h1></div>
+        <div class="top-actions"><span class="sync-pill" id="sync-status">● Saved on this device</span><button class="icon-button" title="Notifications">♧</button><button class="avatar avatar-btn" id="account-btn" data-account title="Account" aria-label="Account">N</button></div>
+      </header>
+
+      <section class="view active" id="view-dashboard">
+        <div class="hero">
+          <div><span class="hero-kicker">MAKE TODAY COUNT</span><h2>Small steps.<br><em>Big progress.</em></h2><p>Rencanakan dengan sadar, fokus pada hal penting, dan rayakan progresmu.</p><button class="primary-button" data-go="tasks">+ Add a task</button></div>
+          <div class="hero-orbit"><div class="orbit-ring"></div><div class="orbit-core">FOCUS<br><b>FLOW</b></div><span class="orbit-dot dot-one"></span><span class="orbit-dot dot-two"></span></div>
+        </div>
+        <div class="stats-grid">
+          <article class="stat-card"><span class="stat-icon purple">☷</span><span class="stat-label">Tasks completed</span><strong id="stat-completed">0</strong><small>Keep moving forward</small></article>
+          <article class="stat-card"><span class="stat-icon green">◷</span><span class="stat-label">Focus minutes</span><strong id="stat-focus">0</strong><small>Total recorded sessions</small></article>
+          <article class="stat-card"><span class="stat-icon orange">✳</span><span class="stat-label">Active habits</span><strong id="stat-habits">0</strong><small>Build consistency</small></article>
+        </div>
+        <div class="content-grid">
+          <section class="panel"><div class="panel-heading"><div><span class="eyebrow">YOUR PRIORITIES</span><h3>Today's tasks</h3></div><button class="text-button" data-go="tasks">View all →</button></div><div id="dashboard-tasks" class="task-list"></div></section>
+          <section class="panel focus-panel"><div class="panel-heading"><div><span class="eyebrow">DEEP WORK</span><h3>Focus session</h3></div><span class="live-dot">● READY</span></div><div class="mini-timer" id="mini-timer">25:00</div><p class="muted center">One thing at a time. You’ve got this.</p><button class="primary-button full" data-go="focus">Start focusing →</button></section>
+        </div>
+      </section>
+
+      <section class="view" id="view-tasks">
+        <div class="section-intro"><div><span class="eyebrow">GET THINGS DONE</span><h2>My Tasks</h2><p class="muted">Capture your tasks. Make progress visible.</p></div><button class="primary-button" id="new-task-btn">+ New task</button></div>
+        <div class="panel">
+          <div class="filter-row"><button class="filter active" data-filter="all">All tasks</button><button class="filter" data-filter="open">To do</button><button class="filter" data-filter="done">Completed</button></div>
+          <div id="task-list" class="task-list"></div>
+        </div>
+      </section>
+
+      <section class="view" id="view-focus">
+        <div class="section-intro"><div><span class="eyebrow">PROTECT YOUR ATTENTION</span><h2>Focus Timer</h2><p class="muted">Work in focused intervals, then take a real break.</p></div></div>
+        <div class="focus-layout">
+          <section class="panel timer-card">
+            <div class="timer-tabs"><button class="timer-tab active" data-mode="focus">Focus</button><button class="timer-tab" data-mode="short">Short break</button><button class="timer-tab" data-mode="long">Long break</button></div>
+            <div class="timer-ring"><div><strong id="timer-display">25:00</strong><span id="timer-caption">TIME TO FOCUS</span></div></div>
+            <div class="timer-controls"><button class="primary-button" id="timer-start">Start focus</button><button class="secondary-button" id="timer-reset">Reset</button></div>
+            <p class="muted center" id="timer-message">Choose one task and give it your full attention.</p>
+          </section>
+          <section class="panel"><span class="eyebrow">SESSION SETTINGS</span><h3>Make it yours</h3><label class="field-label">Focus duration (minutes)<input id="focus-length" type="number" min="1" max="90" value="25"></label><label class="field-label">Short break (minutes)<input id="short-length" type="number" min="1" max="30" value="5"></label><label class="field-label">Long break (minutes)<input id="long-length" type="number" min="1" max="60" value="15"></label><div class="divider"></div><div class="setting-row"><span>Completed focus sessions</span><b id="session-count">0</b></div><div class="setting-row"><span>Total focus time</span><b id="focus-total">0 min</b></div></section>
+        </div>
+      </section>
+
+      <section class="view" id="view-habits">
+        <div class="section-intro"><div><span class="eyebrow">CONSISTENCY OVER INTENSITY</span><h2>Habit Tracker</h2><p class="muted">Small routines create meaningful change.</p></div><button class="primary-button" id="new-habit-btn">+ New habit</button></div>
+        <div class="panel"><div id="habit-list" class="habit-list"></div></div>
+      </section>
+      <footer>FocusFlow <span>•</span> Your personal productivity space <span id="offline-note">• Offline-ready</span></footer>
+    </main>
+  </div>
+  <nav class="bottom-nav" aria-label="Main navigation">
+    <button class="active" data-view="dashboard"><span>⌂</span>Home</button>
+    <button data-view="tasks"><span>☷</span>Tasks</button>
+    <button data-view="focus"><span>◷</span>Focus</button>
+    <button data-view="habits"><span>✳</span>Habits</button>
+  </nav>
+  <dialog id="task-dialog"><form method="dialog" id="task-form"><div class="dialog-head"><h3 id="task-dialog-title">Create a task</h3><button class="icon-button" value="cancel" aria-label="Close">×</button></div><input type="hidden" id="task-id"><label class="field-label">Task name<input id="task-title" required maxlength="120" placeholder="What needs to get done?"></label><label class="field-label">Priority<select id="task-priority"><option value="medium">Medium</option><option value="high">High</option><option value="low">Low</option></select></label><label class="field-label">Due date<input id="task-due" type="date"></label><div class="dialog-actions"><button class="secondary-button" value="cancel">Cancel</button><button class="primary-button" id="task-save" value="default">Save task</button></div></form></dialog>
+  <dialog id="habit-dialog"><form method="dialog" id="habit-form"><div class="dialog-head"><h3>New habit</h3><button class="icon-button" value="cancel">×</button></div><label class="field-label">Habit name<input id="habit-title" required maxlength="80" placeholder="e.g. Read 10 pages"></label><div class="dialog-actions"><button class="secondary-button" value="cancel">Cancel</button><button class="primary-button" value="default">Add habit</button></div></form></dialog>
+  <div class="toast" id="toast" role="status"></div>
+
+  <dialog id="account-dialog">
+    <div class="dialog-head"><h3>Account</h3><button class="icon-button" type="button" id="account-close" aria-label="Close">×</button></div>
+    <div id="account-out">
+      <p class="account-note">Sign in with Google to prepare your account for cloud sync (coming next). Your tasks, habits and timer stay on this device for now.</p>
+      <button class="primary-button google-btn" type="button" id="google-signin">Continue with Google</button>
+      <p class="account-hint" id="account-hint" role="status"></p>
+    </div>
+    <div id="account-in" hidden>
+      <div class="account-user"><span class="avatar" id="dialog-avatar">N</span><div><b id="account-name"></b><small id="account-email"></small></div></div>
+      <p class="account-note">Signed in with Google. Signing out keeps your data on this device.</p>
+      <button class="secondary-button" type="button" id="signout-btn">Sign out</button>
+    </div>
+  </dialog>
+  <script src="./assets/config.js"></script>
+  <script src="./assets/auth.js"></script>
+  <script src="./assets/db.js"></script>
+  <script src="./assets/app.js"></script>
+</body>
+</html>
