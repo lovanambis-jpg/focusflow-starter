@@ -76,7 +76,7 @@
       const live = [];
       byName[name].forEach((rec) => {
         if (rec.deletedAt) { snap[name].set(rec.id, { json: null, createdAt: rec.createdAt || 0, tomb: true }); return; }
-        const { createdAt, updatedAt, deletedAt, ...item } = rec;
+        const { createdAt, updatedAt, deletedAt, _d, ...item } = rec;
         snap[name].set(item.id, { json: JSON.stringify(item), createdAt: createdAt || 0, tomb: false });
         live.push({ item, createdAt: createdAt || 0 });
       });
@@ -108,12 +108,12 @@
         const cur = snap[name].get(item.id);
         if (cur && !cur.tomb && cur.json === json) return;
         const createdAt = (cur && cur.createdAt) || now;
-        os.put({ ...item, createdAt, updatedAt: now, deletedAt: null });
+        os.put({ ...item, createdAt, updatedAt: now, deletedAt: null, _d: 1 });
         pending.push([name, item.id, { json, createdAt, tomb: false }]);
       });
       snap[name].forEach((cur, id) => {
         if (seen.has(id) || cur.tomb) return;
-        os.put({ id, createdAt: cur.createdAt, updatedAt: now, deletedAt: now });
+        os.put({ id, createdAt: cur.createdAt, updatedAt: now, deletedAt: now, _d: 1 });
         pending.push([name, id, { json: null, createdAt: cur.createdAt, tomb: true }]);
       });
     });
@@ -189,8 +189,8 @@
 
   /** Persists the whole state (only changed records are written). Calls are queued in order. */
   function save(state) {
-    const copy = JSON.parse(JSON.stringify(state));
     const run = () => {
+      const copy = JSON.parse(JSON.stringify(state)); // copied when it runs, so it always sees the latest in-memory state
       if (mode === "localstorage") {
         return new Promise((res, rej) => { try { localStorage.setItem(LEGACY_KEY, JSON.stringify(copy)); res(); } catch (e) { rej(e); } });
       }
@@ -201,5 +201,97 @@
     return p;
   }
 
-  window.FocusDB = { start, save, get mode() { return mode; } };
+  // ---- sync helpers (tasks only; used by assets/sync.js) -----------------------------
+  // Records that still need uploading carry _d:1. Bookkeeping {user, cursor} lives in meta key "sync".
+  const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  const newUuid = () => (crypto.randomUUID ? crypto.randomUUID()
+    : "10000000-1000-4000-8000-100000000000".replace(/[018]/g, (c) => (c ^ (crypto.getRandomValues(new Uint8Array(1))[0] & (15 >> (c / 4)))).toString(16)));
+  const taskKey = (r) => JSON.stringify([r.title, r.priority, r.due, r.done, r.deletedAt ? 1 : 0]);
+  let onTasksReplaced = null;
+  const queued = (fn) => { const p = chain.then(fn); chain = p.catch(() => {}); return p; };
+  async function allTaskRecs() {
+    const db = await openDb();
+    return reqP(db.transaction("tasks", "readonly").objectStore("tasks").getAll());
+  }
+  // Reloads IndexedDB into memory (also refreshes the diff snapshot) and hands the tasks to the UI.
+  async function refreshTasks() { const st = await loadFromIdb(); if (onTasksReplaced) onTasksReplaced(st.tasks); }
+
+  /** First sync for this account on this device: mark every local task as "needs upload". Returns {user, cursor}. */
+  function syncBind(userId) {
+    return queued(async () => {
+      const cur = await getMeta("sync");
+      if (cur && cur.user === userId) return cur;
+      const recs = await allTaskRecs();
+      const db = await openDb();
+      const t = db.transaction(["tasks", "meta"], "readwrite");
+      recs.forEach((r) => t.objectStore("tasks").put({ ...r, _d: 1 }));
+      const value = { user: userId, cursor: null };
+      t.objectStore("meta").put({ key: "sync", value, updatedAt: Date.now() });
+      await txDone(t);
+      return value;
+    });
+  }
+  function syncSetCursor(userId, cursor) {
+    return queued(() => setMeta("sync", { user: userId, cursor }));
+  }
+  /** incoming: [{id, deleted, createdAt, updatedAt, item?}] from the server. Unsynced local edits that are newer win. */
+  function syncApplyTasks(incoming) {
+    return queued(async () => {
+      const local = new Map((await allTaskRecs()).map((r) => [r.id, r]));
+      const db = await openDb();
+      const t = db.transaction("tasks", "readwrite");
+      const os = t.objectStore("tasks");
+      let changed = 0;
+      incoming.forEach((n) => {
+        const cur = local.get(n.id);
+        if (cur && cur._d && cur.updatedAt > n.updatedAt) return;
+        if (n.deleted && (!cur || cur.deletedAt)) return;
+        const createdAt = (cur && cur.createdAt) || n.createdAt;
+        const rec = n.deleted
+          ? { id: n.id, createdAt, updatedAt: n.updatedAt, deletedAt: n.updatedAt }
+          : { ...n.item, createdAt, updatedAt: n.updatedAt, deletedAt: null };
+        if (cur && !cur._d && taskKey(cur) === taskKey(rec)) return;
+        os.put(rec);
+        changed++;
+      });
+      await txDone(t);
+      if (changed) await refreshTasks();
+      return changed;
+    });
+  }
+  /** Returns raw task records waiting for upload. Non-UUID ids (very old data) get a new UUID first. */
+  function syncDirtyTasks() {
+    return queued(async () => {
+      let dirty = (await allTaskRecs()).filter((r) => r._d);
+      const bad = dirty.filter((r) => !UUID_RE.test(r.id));
+      if (bad.length) {
+        const db = await openDb();
+        const t = db.transaction("tasks", "readwrite");
+        bad.forEach((r) => { t.objectStore("tasks").delete(r.id); if (!r.deletedAt) t.objectStore("tasks").put({ ...r, id: newUuid() }); });
+        await txDone(t);
+        await refreshTasks();
+        dirty = (await allTaskRecs()).filter((r) => r._d);
+      }
+      return dirty;
+    });
+  }
+  /** list: [{id, updatedAt}] that were uploaded. A record edited meanwhile (different updatedAt) stays dirty. */
+  function syncClearDirty(list) {
+    return queued(async () => {
+      const recs = new Map((await allTaskRecs()).map((r) => [r.id, r]));
+      const db = await openDb();
+      const t = db.transaction("tasks", "readwrite");
+      list.forEach(({ id, updatedAt }) => {
+        const r = recs.get(id);
+        if (r && r._d && r.updatedAt === updatedAt) { const { _d, ...rest } = r; t.objectStore("tasks").put(rest); }
+      });
+      await txDone(t);
+    });
+  }
+
+  window.FocusDB = {
+    start, save, get mode() { return mode; },
+    set onTasksReplaced(fn) { onTasksReplaced = fn; },
+    syncBind, syncSetCursor, syncApplyTasks, syncDirtyTasks, syncClearDirty
+  };
 })();

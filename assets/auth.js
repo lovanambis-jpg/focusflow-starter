@@ -127,6 +127,7 @@
     get reason() { return reason; },
     onChange(fn) { listeners.add(fn); return () => listeners.delete(fn); },
     get user() { return user; },
+    get client() { return client; },
     get status() { return status; }
   };
 })();

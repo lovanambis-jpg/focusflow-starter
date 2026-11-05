@@ -5,9 +5,9 @@ const today = () => dayStr(0);
 const streak = (logs) => { const s=new Set(logs||[]); let off=s.has(dayStr(0))?0:-1, n=0; while(s.has(dayStr(off))){n++;off--;} return n; };
 let state = {tasks:[],habits:[],sessions:[],settings:{focus:25,short:5,long:15}}; // replaced by FocusDB.start() in boot()
 let filter = "all";
-let greetName = "Nandra", currentView = "dashboard";
+let greetName = "NANDRA", currentView = "dashboard";
 let mode = "focus", remaining = state.settings.focus*60, interval = null, running = false, endAt = null, planned = state.settings.focus;
-const save = () => { render(); $("#sync-status").textContent = "● Saving…"; FocusDB.save(state).then(()=>{ $("#sync-status").textContent = FocusDB.mode==="indexeddb" ? "● Saved on this device" : "● Saved on this device (basic mode)"; }).catch(()=>{ $("#sync-status").textContent = "● Could not save (storage full or blocked)"; }); };
+const save = () => { render(); $("#sync-status").textContent = "● Saving…"; FocusDB.save(state).then(()=>{ $("#sync-status").textContent = FocusDB.mode==="indexeddb" ? "● Saved on this device" : "● Saved on this device (basic mode)"; if(window.FocusSync) FocusSync.schedule(); }).catch(()=>{ $("#sync-status").textContent = "● Could not save (storage full or blocked)"; }); };
 const id = () => crypto.randomUUID ? crypto.randomUUID() : String(Date.now()+Math.random());
 const toast = (msg) => { const el=$("#toast"); el.textContent=msg; el.classList.add("show"); setTimeout(()=>el.classList.remove("show"),2200); };
 const escapeHtml = (s) => String(s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
@@ -43,6 +43,8 @@ async function boot(){
   remaining=durations()[mode]*60; planned=durations()[mode];
   $("#sync-status").textContent = FocusDB.mode==="indexeddb" ? "● Saved on this device" : "● Saved on this device (basic mode)";
   render(); displayTimer();
+  FocusDB.onTasksReplaced = (tasks) => { state.tasks = tasks; render(); };
+  if(window.FocusSync) FocusSync.start();
 }
 boot();
 
@@ -60,7 +62,7 @@ function renderAccount(){
   $("#side-name").textContent = p ? label : "My Workspace";
   $("#side-sub").textContent = p ? "Signed in with Google" : "Local mode";
   greetName = (p && p.name.split(" ")[0]) || "Nandra";
-  if(currentView==="dashboard") $("#page-title").textContent = "Good day, "+greetName+" 👋";
+  if(currentView==="dashboard") $("#page-title").textContent = "Good Day, "+greetName+" 👋";
   $("#account-out").hidden = !!p; $("#account-in").hidden = !p;
   $("#account-name").textContent = p ? (p.name || p.email) : ""; $("#account-email").textContent = p ? p.email : "";
   const btn = $("#google-signin");
