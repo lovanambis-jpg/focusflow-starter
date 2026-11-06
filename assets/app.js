@@ -1,24 +1,17 @@
-const $ = (s) => document.querySelector(s);
-const $$ = (s) => [...document.querySelectorAll(s)];
-const dayStr = (off=0) => { const d=new Date(); d.setDate(d.getDate()+off); return new Date(d-d.getTimezoneOffset()*60000).toISOString().slice(0,10); };
-const today = () => dayStr(0);
-const streak = (logs) => { const s=new Set(logs||[]); let off=s.has(dayStr(0))?0:-1, n=0; while(s.has(dayStr(off))){n++;off--;} return n; };
-let state = {tasks:[],habits:[],sessions:[],settings:{focus:25,short:5,long:15}}; // replaced by FocusDB.start() in boot()
+import { $, $$, dayStr, today, streak, id, toast, escapeHtml } from "./core/utils.js";
+import { state, setState, onRender, render, save, setStatus } from "./core/store.js";
+onRender(renderAll);
 let filter = "all";
 let greetName = "", currentView = "dashboard";
 const greeting = () => greetName ? "Good day, " + greetName + " 👋" : "Good day 👋";
 let mode = "focus", remaining = state.settings.focus*60, interval = null, running = false, endAt = null, planned = state.settings.focus;
-const save = () => { render(); $("#sync-status").textContent = "● Saving…"; FocusDB.save(state).then(()=>{ $("#sync-status").textContent = FocusDB.mode==="indexeddb" ? "● Saved on this device" : "● Saved on this device (basic mode)"; if(window.FocusSync) FocusSync.schedule(); }).catch(()=>{ $("#sync-status").textContent = "● Could not save (storage full or blocked)"; }); };
-const id = () => crypto.randomUUID ? crypto.randomUUID() : String(Date.now()+Math.random());
-const toast = (msg) => { const el=$("#toast"); el.textContent=msg; el.classList.add("show"); setTimeout(()=>el.classList.remove("show"),2200); };
-const escapeHtml = (s) => String(s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 function setView(name){currentView=name;$$(".view").forEach(v=>v.classList.toggle("active",v.id===`view-${name}`));$$("[data-view]").forEach(b=>b.classList.toggle("active",b.dataset.view===name));$("#page-title").textContent=({dashboard:greeting(),tasks:"My Tasks",focus:"Focus Timer",habits:"Habit Tracker"})[name]||"FocusFlow";window.scrollTo(0,0);}
 $$("[data-view]").forEach(b=>b.addEventListener("click",()=>setView(b.dataset.view)));
 $$("[data-go]").forEach(b=>b.addEventListener("click",()=>setView(b.dataset.go)));
 function taskMarkup(t){return `<div class="task-row ${t.done?"completed":""}"><input class="task-check" type="checkbox" data-complete="${t.id}" ${t.done?"checked":""}><div class="task-main"><b>${escapeHtml(t.title)}</b><small>${t.due?`Due ${t.due}`:"No deadline"}</small></div><span class="priority ${t.priority}">${t.priority}</span><div class="row-actions"><button title="Edit" data-edit="${t.id}">✎</button><button title="Delete" data-delete="${t.id}">×</button></div></div>`}
 function renderTasks(){const list=state.tasks.filter(t=>filter==="all"||(filter==="open"&&!t.done)||(filter==="done"&&t.done));$("#task-list").innerHTML=list.length?list.map(taskMarkup).join(""):'<div class="empty-state">No tasks here yet. Add your first task ✨</div>';const todayTasks=state.tasks.filter(t=>!t.done).slice(0,4);$("#dashboard-tasks").innerHTML=todayTasks.length?todayTasks.map(taskMarkup).join(""):'<div class="empty-state">Your space is clear. Add a task to get started.</div>';$$("[data-complete]").forEach(el=>el.addEventListener("change",()=>{const t=state.tasks.find(x=>x.id===el.dataset.complete);if(t)t.done=el.checked;save();}));$$("[data-delete]").forEach(el=>el.addEventListener("click",()=>{state.tasks=state.tasks.filter(x=>x.id!==el.dataset.delete);save();toast("Task deleted");}));$$("[data-edit]").forEach(el=>el.addEventListener("click",()=>openTask(el.dataset.edit)));}
 function renderHabits(){const day=today();$("#habit-list").innerHTML=state.habits.length?state.habits.map(h=>{const done=(h.logs||[]).includes(day);return `<div class="habit-row"><div class="habit-emoji">✳</div><div class="habit-info"><b>${escapeHtml(h.title)}</b><small>${streak(h.logs)}-day streak · ${(h.logs||[]).length} check-ins · ${done?"Completed today":"Keep your streak going"}</small></div><button data-habit="${h.id}">${done?"✓ Done":"Check in"}</button></div>`}).join(""):'<div class="empty-state">No habits yet. Start with one small routine.</div>';$$("[data-habit]").forEach(b=>b.addEventListener("click",()=>{const h=state.habits.find(x=>x.id===b.dataset.habit);if(!h.logs)h.logs=[];const d=today();h.logs=h.logs.includes(d)?h.logs.filter(x=>x!==d):[...h.logs,d];save();}));}
-function render(){renderTasks();renderHabits();$("#stat-completed").textContent=state.tasks.filter(t=>t.done).length;$("#stat-focus").textContent=state.sessions.reduce((a,s)=>a+s.minutes,0);$("#stat-habits").textContent=state.habits.length;$("#session-count").textContent=state.sessions.length;$("#focus-total").textContent=state.sessions.reduce((a,s)=>a+s.minutes,0)+" min";}
+function renderAll(){renderTasks();renderHabits();$("#stat-completed").textContent=state.tasks.filter(t=>t.done).length;$("#stat-focus").textContent=state.sessions.reduce((a,s)=>a+s.minutes,0);$("#stat-habits").textContent=state.habits.length;$("#session-count").textContent=state.sessions.length;$("#focus-total").textContent=state.sessions.reduce((a,s)=>a+s.minutes,0)+" min";}
 function openTask(taskId){const t=state.tasks.find(x=>x.id===taskId);$("#task-dialog-title").textContent=t?"Edit task":"Create a task";$("#task-id").value=t?.id||"";$("#task-title").value=t?.title||"";$("#task-priority").value=t?.priority||"medium";$("#task-due").value=t?.due||"";$("#task-dialog").showModal();}
 $("#new-task-btn").addEventListener("click",()=>openTask());$("#task-form").addEventListener("submit",e=>{if(e.submitter?.value==="cancel")return;e.preventDefault();const task={id:$("#task-id").value||id(),title:$("#task-title").value.trim(),priority:$("#task-priority").value,due:$("#task-due").value};if(!task.title)return;const idx=state.tasks.findIndex(t=>t.id===task.id);if(idx>=0)state.tasks[idx]={...state.tasks[idx],...task};else state.tasks.unshift({...task,done:false});$("#task-dialog").close();save();toast("Task saved");});
 $("#new-habit-btn").addEventListener("click",()=>$("#habit-dialog").showModal());$("#habit-form").addEventListener("submit",e=>{if(e.submitter?.value==="cancel")return;e.preventDefault();const title=$("#habit-title").value.trim();if(!title)return;state.habits.push({id:id(),title,logs:[]});$("#habit-dialog").close();$("#habit-title").value="";save();toast("Habit added");});
@@ -36,15 +29,15 @@ $("#timer-reset").addEventListener("click",()=>selectMode(mode));
 ["focus","short","long"].forEach(k=>$("#"+k+"-length").addEventListener("change",()=>{state.settings=durations();save();selectMode(mode);}));
 $("#today-label").textContent=new Date().toLocaleDateString("id-ID",{weekday:"long",day:"numeric",month:"long",year:"numeric"}).toUpperCase();
 if("serviceWorker" in navigator && location.protocol!=="file:"){navigator.serviceWorker.register("./service-worker.js").catch(()=>{});}
-window.addEventListener("online",()=>{$("#sync-status").textContent="● Online · local data saved";});window.addEventListener("offline",()=>{$("#sync-status").textContent="● Offline · local mode";});
+window.addEventListener("online",()=>{setStatus("● Online · local data saved");});window.addEventListener("offline",()=>{setStatus("● Offline · local mode");});
 async function boot(){
-  try { const res = await FocusDB.start(); state = res.state; if(res.migrated) toast("Existing data moved to IndexedDB"); }
+  try { const res = await FocusDB.start(); setState(res.state); if(res.migrated) toast("Existing data moved to IndexedDB"); }
   catch(e){ console.error(e); }
   ["focus","short","long"].forEach(k=>{$("#"+k+"-length").value=state.settings[k];});
   remaining=durations()[mode]*60; planned=durations()[mode];
-  $("#sync-status").textContent = FocusDB.mode==="indexeddb" ? "● Saved on this device" : "● Saved on this device (basic mode)";
+  setStatus(FocusDB.mode==="indexeddb" ? "● Saved on this device" : "● Saved on this device (basic mode)");
   render(); displayTimer();
-   FocusDB.onReplaced = (name, items) => { state[name] = items; render(); };
+  FocusDB.onReplaced = (name, items) => { state[name] = items; render(); };
   if(window.FocusSync) FocusSync.start();
 }
 boot();
@@ -62,7 +55,7 @@ function renderAccount(){
   ["#account-btn","#side-avatar","#dialog-avatar"].forEach(sel=>setAvatar($(sel), p && p.avatar, initial));
   $("#side-name").textContent = p ? label : "My Workspace";
   $("#side-sub").textContent = p ? "Signed in with Google" : "Local mode";
- greetName = (p && p.name.split(" ")[0]) || "";
+  greetName = (p && p.name.split(" ")[0]) || "";
   if(currentView==="dashboard") $("#page-title").textContent = greeting();
   $("#account-out").hidden = !!p; $("#account-in").hidden = !p;
   $("#account-name").textContent = p ? (p.name || p.email) : ""; $("#account-email").textContent = p ? p.email : "";
@@ -91,3 +84,6 @@ $("#signout-btn").addEventListener("click",async()=>{
 });
 FocusAuth.onChange(renderAccount);
 FocusAuth.init();
+
+// Small handle for automated tests (a module's variables are no longer globals).
+window.FocusApp = { get state() { return state; }, today, save };
