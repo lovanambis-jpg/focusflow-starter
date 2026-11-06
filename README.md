@@ -11,6 +11,11 @@ Personal AI Productivity & Focus Management Platform.
 - PWA manifest and service worker shell cache
 
 ## Changelog
+   ### v1.4
+   - Bottom navigation for mobile (<= 650px)
+   - Cloud sync of tasks, habits, habit check-ins and focus sessions with Supabase (assets/sync.js); needs migration 0004
+   - Safety copy so the last change survives an instant reload
+   - Neutral greeting when signed out
 ### v1.3.1
 - Fix: service worker (v5) now revalidates with the server (`cache: "no-cache"`) and precaches with `cache: "reload"`. In v1.3 the browser HTTP cache could keep serving an old `assets/config.js` even after you edited it
 - `assets/config.js` is validated: a missing/empty file, missing URL or key, malformed URL, or a **secret/service_role key** gives a specific hint in the account dialog instead of a generic failure
