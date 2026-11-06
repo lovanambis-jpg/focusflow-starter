@@ -1,4 +1,4 @@
-const CACHE = "focusflow-shell-v8";
+const CACHE = "focusflow-shell-v9";
 const FILES = ["./", "./index.html", "./assets/style.css", "./assets/app.js", "./assets/db.js", "./assets/sync.js", "./assets/auth.js", "./assets/config.js", "./manifest.webmanifest", "./assets/icons/icon-192.png", "./assets/icons/icon-512.png"];
 self.addEventListener("install", event => { self.skipWaiting(); event.waitUntil(caches.open(CACHE).then(cache => cache.addAll(FILES.map(url => new Request(url, { cache: "reload" }))))); });
 self.addEventListener("activate", event => event.waitUntil(caches.keys().then(keys => Promise.all(keys.filter(k => k !== CACHE).map(k => caches.delete(k)))).then(() => self.clients.claim())));
